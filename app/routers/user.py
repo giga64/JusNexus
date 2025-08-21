@@ -1,0 +1,9 @@
+from fastapi import APIRouter, Depends
+from app.services.auth import get_user_from_token
+from app.models.user import User
+
+router = APIRouter()
+
+@router.get("/profile")
+def get_user_profile(current_user: User = Depends(get_user_from_token)):
+    return {"id": current_user.id, "full_name": current_user.full_name, "email": current_user.email, "role": current_user.role}
