@@ -7,7 +7,6 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import AssistantChat from "./pages/AssistantChat";
 import NotFound from "./pages/NotFound";
-import AuthWrapper from "./components/AuthWrapper";
 
 const queryClient = new QueryClient();
 
@@ -19,8 +18,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<AuthWrapper><Dashboard /></AuthWrapper>} />
-          <Route path="/assistant/:sector/:assistant" element={<AuthWrapper><AssistantChat /></AuthWrapper>} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/assistant/:sector/:assistant" element={<AssistantChat />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
