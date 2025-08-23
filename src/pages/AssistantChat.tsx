@@ -1,34 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import ParticleBackground from "@/components/ParticleBackground";
 import RobotAssistant from "@/components/RobotAssistant"; 
 import FileUpload from "@/components/FileUpload";
 import DocumentTemplates from "@/components/DocumentTemplates";
 import { ProcessData } from "@/utils/documentProcessor";
-import { 
-  Shield, 
-  ArrowLeft, 
-  Send, 
-  FileText, 
-  Download,
-  Upload
-} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Shield, ArrowLeft, Send } from "lucide-react";
+
+interface Message {
+  id: number;
+  type: 'user' | 'assistant';
+  content: string;
+}
 
 const AssistantChat = () => {
-  const { sector, assistant } = useParams();
+  const { assistant } = useParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
+  
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processNumber, setProcessNumber] = useState("");
-  const [additionalInfo, setAdditionalInfo] = useState("");
   const [extractedData, setExtractedData] = useState<ProcessData | null>(null);
-  const [messages, setMessages] = useState<Array<{id: number, type: 'user' | 'assistant', content: string}>>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
 
-  // Assistant configuration based on type
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const assistantConfig = {
     recursos: {
       name: "Assistente de Recursos",
@@ -64,80 +64,77 @@ const AssistantChat = () => {
     setMessages([{
       id: 1,
       type: 'assistant',
-      content: `Olá! Sou o ${currentAssistant?.name}. Você pode fazer upload do arquivo do processo ou inserir os dados manualmente. Como posso ajudá-lo hoje?`
+      content: `Olá! Sou o ${currentAssistant?.name}. Você pode fazer upload do arquivo do processo para começarmos.`
     }]);
   }, [currentAssistant]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   const handleFileProcessed = (data: ProcessData) => {
     setExtractedData(data);
-    setProcessNumber(data.number);
-    
-    const message = {
+    const newMessage: Message = {
       id: messages.length + 1,
-      type: 'assistant' as const,
-      content: `✅ **Arquivo processado com sucesso!**\n\n📋 **Dados extraídos:**\n- Processo: ${data.number}\n- Autor: ${data.parties.plaintiff}\n- Réu: ${data.parties.defendant}\n- Valor: ${data.value}\n- Assunto: ${data.subject}\n\nAgora você pode selecionar o tipo de documento que deseja gerar.`
+      type: 'assistant',
+      content: `✅ **Arquivo processado!** Os dados do processo foram carregados. Agora você pode me fazer perguntas sobre o caso ou gerar um documento ao lado.`
     };
-    
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [...prev, newMessage]);
   };
 
   const handleDocumentGenerated = (document: string) => {
-    const message = {
+    const newMessage: Message = {
       id: messages.length + 1,
-      type: 'assistant' as const,
-      content: `📄 **Documento gerado com sucesso!**\n\nO documento foi criado com base nos dados do processo e está pronto para download. Você pode visualizar o preview e fazer o download quando desejar.`
+      type: 'assistant',
+      content: `📄 **Documento gerado!** O preview está disponível ao lado e você pode fazer o download.`
     };
-    
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [...prev, newMessage]);
   };
 
-  const handleProcessSubmit = async () => {
-    if (!processNumber.trim()) return;
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || !extractedData || !token) return;
 
-    setIsProcessing(true);
-    
-    const userMessage = {
-      id: messages.length + 1,
-      type: 'user' as const,
-      content: `Número do processo: ${processNumber}${additionalInfo ? `\n\nInformações adicionais: ${additionalInfo}` : ''}`
-    };
-    
+    const userMessage: Message = { id: Date.now(), type: 'user', content: inputMessage };
     setMessages(prev => [...prev, userMessage]);
+    setInputMessage("");
+    setIsProcessing(true);
 
-    setTimeout(() => {
-      const assistantResponse = {
-        id: messages.length + 2,
-        type: 'assistant' as const,
-        content: `Analisando o processo ${processNumber}...\n\n✅ Dados extraídos com sucesso!\n\n📋 **Resumo do Processo:**\n- Número: ${processNumber}\n- Tipo: ${getProcessType()}\n- Status: Em andamento\n\n🤖 Processo pronto para geração de documentos!`
-      };
-      
-      setMessages(prev => [...prev, assistantResponse]);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/process/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          history: messages,
+          message: inputMessage,
+          processData: extractedData,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || "Erro na API de chat.");
+
+      const assistantMessage: Message = { id: Date.now() + 1, type: 'assistant', content: result.reply };
+      setMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.error(error);
+      const errorMessage: Message = { id: Date.now() + 1, type: 'assistant', content: "Desculpe, não consegui processar sua solicitação no momento." };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsProcessing(false);
-    }, 2000);
-  };
-
-  const getProcessType = () => {
-    switch (assistant) {
-      case 'recursos': return 'Recurso/Apelação';
-      case 'contestacao': return 'Contestação';
-      case 'ajuizamento': return 'Petição Inicial';
-      case 'processual': return 'Manifestação Processual';
-      case 'negocial': return 'Negociação/Acordo';
-      default: return 'Processo Geral';
     }
   };
 
-  if (!currentAssistant) {
-    return <div>Assistente não encontrado</div>;
-  }
+  if (!currentAssistant) return <div>Assistente não encontrado</div>;
 
   return (
     <div className="min-h-screen relative">
       <ParticleBackground />
-      
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background-secondary to-background-tertiary" />
-      
       <div className="relative z-10">
         {/* Header */}
         <header className="flex items-center justify-between p-6 glass border-b border-border/50">
@@ -176,15 +173,12 @@ const AssistantChat = () => {
                     Assistente IA
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-center">
+                <CardContent>
                   <RobotAssistant 
                     name={currentAssistant.name}
                     type={assistant as any}
                     isActive={isProcessing}
                   />
-                  <p className="text-sm text-muted-foreground mt-4">
-                    {currentAssistant.description}
-                  </p>
                 </CardContent>
               </Card>
 
@@ -196,58 +190,11 @@ const AssistantChat = () => {
                       Dados do Processo
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent>
                     <FileUpload 
                       onFileProcessed={handleFileProcessed}
                       isProcessing={isProcessing}
                     />
-                    
-                    {/* Manual Process Input */}
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="process" className="text-foreground">
-                          Número do Processo (Manual)
-                        </Label>
-                        <Input
-                          id="process"
-                          placeholder="0000000-00.0000.0.00.0000"
-                          value={processNumber}
-                          onChange={(e) => setProcessNumber(e.target.value)}
-                          className="glass border-border focus:border-primary"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="info" className="text-foreground">
-                          Informações Adicionais
-                        </Label>
-                        <Textarea
-                          id="info"
-                          placeholder="Descreva detalhes específicos do caso..."
-                          value={additionalInfo}
-                          onChange={(e) => setAdditionalInfo(e.target.value)}
-                          className="glass border-border focus:border-primary min-h-[100px]"
-                        />
-                      </div>
-
-                      <Button 
-                        onClick={handleProcessSubmit}
-                        disabled={!processNumber.trim() || isProcessing}
-                        className="w-full bg-gradient-brand hover:scale-105 transition-all duration-300"
-                      >
-                        {isProcessing ? (
-                          <>
-                            <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-2" />
-                            Analisar Processo
-                          </>
-                        )}
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               ) : (
@@ -261,45 +208,48 @@ const AssistantChat = () => {
 
             {/* Right Column - Chat Panel */}
             <div className="lg:col-span-2">
-              <Card className="glass border-glow h-[600px] flex flex-col">
+              <Card className="glass border-glow h-[75vh] flex flex-col">
                 <CardHeader>
                   <CardTitle className="text-lg text-foreground">
                     Conversa com o Assistente
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
+                <CardContent className="flex-1 flex flex-col overflow-hidden">
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                  <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-4">
                     {messages.map((message) => (
-                      <div 
-                        key={message.id}
-                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div 
-                          className={`max-w-[80%] p-4 rounded-lg ${
-                            message.type === 'user' 
-                              ? 'bg-gradient-brand text-primary-foreground' 
-                              : 'glass border border-border text-foreground'
-                          }`}
-                        >
-                          <pre className="whitespace-pre-wrap text-sm font-sans">
-                            {message.content}
-                          </pre>
+                      <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-lg ${message.type === 'user' ? 'bg-gradient-brand text-primary-foreground' : 'glass border border-border text-foreground'}`}>
+                          <p className="whitespace-pre-wrap text-sm font-sans">{message.content}</p>
                         </div>
                       </div>
                     ))}
-                    
                     {isProcessing && (
                       <div className="flex justify-start">
-                        <div className="glass border border-border p-4 rounded-lg">
+                        <div className="glass border border-border p-3 rounded-lg">
                           <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                            <span className="text-foreground">Processando arquivo...</span>
+                            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0s' }}/>
+                            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}/>
+                            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}/>
                           </div>
                         </div>
                       </div>
                     )}
+                    <div ref={messagesEndRef} />
                   </div>
+                  
+                  <form onSubmit={handleSendMessage} className="flex items-center space-x-2 border-t border-border/50 pt-4">
+                    <Input
+                      placeholder={extractedData ? "Faça uma pergunta sobre o processo..." : "Faça upload de um arquivo para começar."}
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      disabled={!extractedData || isProcessing}
+                      className="flex-1 glass"
+                    />
+                    <Button type="submit" size="icon" disabled={!inputMessage.trim() || isProcessing}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </form>
                 </CardContent>
               </Card>
             </div>

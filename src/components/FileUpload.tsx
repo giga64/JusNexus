@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, File, X, CheckCircle } from "lucide-react";
 import { ProcessData } from "@/utils/documentProcessor";
+import { useAuth } from "@/context/AuthContext";
 
 interface FileUploadProps {
   onFileProcessed: (data: ProcessData) => void;
@@ -10,6 +11,7 @@ interface FileUploadProps {
 }
 
 const FileUpload = ({ onFileProcessed, isProcessing }: FileUploadProps) => {
+  const { token } = useAuth();
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [extractedData, setExtractedData] = useState<ProcessData | null>(null);
@@ -41,15 +43,19 @@ const FileUpload = ({ onFileProcessed, isProcessing }: FileUploadProps) => {
   };
 
   const handleFile = async (file: File) => {
-    setUploadedFile(file);
-    
-    // Simulate file processing
-    setTimeout(async () => {
-      const { extractDataFromFile } = await import("@/utils/documentProcessor");
-      const data = await extractDataFromFile(file);
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/process/extract-data`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await response.json();
+    if (response.ok) {
+      setUploadedFile(file);
       setExtractedData(data);
       onFileProcessed(data);
-    }, 1000);
+    }
   };
 
   const removeFile = () => {

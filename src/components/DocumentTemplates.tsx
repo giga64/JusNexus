@@ -6,7 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Download, Eye } from "lucide-react";
-import { ProcessData, generateDocument } from "@/utils/documentProcessor";
+import { ProcessData } from "@/utils/documentProcessor";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface DocumentTemplatesProps {
   processData: ProcessData | null;
@@ -15,6 +17,7 @@ interface DocumentTemplatesProps {
 }
 
 const DocumentTemplates = ({ processData, assistantType, onDocumentGenerated }: DocumentTemplatesProps) => {
+  const { token } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [additionalData, setAdditionalData] = useState<any>({});
   const [generatedDoc, setGeneratedDoc] = useState("");
@@ -60,12 +63,39 @@ const DocumentTemplates = ({ processData, assistantType, onDocumentGenerated }: 
     }));
   };
 
-  const handleGenerateDocument = () => {
-    if (!processData || !selectedTemplate) return;
+  const handleGenerateDocument = async () => {
+    if (!processData || !selectedTemplate || !token) return;
 
-    const document = generateDocument(selectedTemplate, processData, additionalData);
-    setGeneratedDoc(document);
-    onDocumentGenerated(document);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/process/generate-document`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          templateId: selectedTemplate,
+          processData: processData,
+          additionalData: additionalData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Falha ao gerar o documento.");
+      }
+      
+      setGeneratedDoc(result.document);
+      onDocumentGenerated(result.document);
+      toast.success("Documento gerado pela IA com sucesso!");
+
+    } catch (error: any) {
+      console.error("Erro ao gerar documento:", error);
+      toast.error("Erro na Geração", { description: error.message });
+    } finally {
+      // ...existing code...
+    }
   };
 
   const handleDownload = () => {

@@ -6,12 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ParticleBackground from "@/components/ParticleBackground";
 import { Shield, Scale } from "lucide-react";
+
 const Login = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({
     email: "",
     password: ""
   });
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate MDR login validation
@@ -19,7 +21,9 @@ const Login = () => {
       navigate("/dashboard");
     }
   };
-  return <div className="min-h-screen relative flex items-center justify-center p-6">
+
+  return (
+    <div className="min-h-screen relative flex items-center justify-center p-6">
       <ParticleBackground />
       
       {/* Background Gradient Overlay */}
@@ -89,6 +93,8 @@ const Login = () => {
           </p>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Login;

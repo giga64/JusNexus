@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, Boolean
-from sqlalchemy.dialects.postgresql import ENUM
 from app.database import Base
 
 class User(Base):
@@ -9,6 +8,6 @@ class User(Base):
     full_name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    role = Column(ENUM('user', 'admin', name='user_role_enum'), default='user')
+    role = Column(String, default='user')
     is_active = Column(Boolean, default=False)
     is_pending = Column(Boolean, default=True)

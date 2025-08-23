@@ -24,13 +24,12 @@ def get_user_by_id(db: Session, user_id: int):
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(User).offset(skip).limit(limit).all()
 
-def update_user_status(db: Session, user_id: int, user_update: UserUpdate):
+def update_user_status(db: Session, user_id: int, user_update_data: dict):
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
         return None
     
-    update_data = user_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
+    for key, value in user_update_data.items():
         setattr(db_user, key, value)
         
     db.commit()

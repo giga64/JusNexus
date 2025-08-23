@@ -6,6 +6,8 @@ sqlalchemy
 psycopg2-binary
 langchain
 faiss-cpu
-python-gemini-client
+google-generativeai
 python-jose[cryptography]
-passlib[bcrypt]          
+passlib[bcrypt]
+PyPDF2
+python-multipart          

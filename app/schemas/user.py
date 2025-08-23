@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 
 class UserCreate(BaseModel):
@@ -8,15 +8,10 @@ class UserCreate(BaseModel):
     confirm_password: str
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     full_name: str
-    email: EmailStr
-    is_active: bool
-    is_pending: bool
-    role: str
-
-    class Config:
-        orm_mode = True
+    email: str
 
 class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
@@ -25,3 +20,9 @@ class UserUpdate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    full_name: str
+    email: str
